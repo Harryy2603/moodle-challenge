@@ -15,6 +15,7 @@ class ImportService
 
     public function __construct(?UserRepository $userRepository = null)
     {
+        
         $this->userRepository = $userRepository ?? new UserRepository();
     }
 
@@ -60,7 +61,6 @@ class ImportService
                         $record->addError("Database error: " . $e->getMessage());
                     }
                 }
-=
                 if ($record->isValid) {
                     $results['total_valid']++;
                 } else {
