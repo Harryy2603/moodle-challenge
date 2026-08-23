@@ -3,7 +3,9 @@
 namespace App\Repositories;
 
 use PDO;
+use PDOException;
 use App\Infrastructure\Database;
+use App\Domain\UserRecord;
 
 class UserRepository
 {
@@ -16,7 +18,6 @@ class UserRepository
 
     public function createTable(): void
     {
-        // The PDF requires at least name, surname, and a UNIQUE email[cite: 1].
         $sql = "
             DROP TABLE IF EXISTS users;
             CREATE TABLE users (
@@ -28,5 +29,27 @@ class UserRepository
         ";
         
         $this->db->exec($sql);
+    }
+
+    public function insert(UserRecord $record): bool
+    {
+        try {
+            $sql = "INSERT INTO users (name, surname, email) VALUES (:name, :surname, :email)";
+            $stmt = $this->db->prepare($sql);
+            
+            $stmt->execute([
+                ':name'    => $record->name,
+                ':surname' => $record->surname,
+                ':email'   => $record->email
+            ]);
+            
+            return true;
+        } catch (PDOException $e) {
+             if ($e->getCode() === '23505') {
+                return false;
+            }
+            
+            throw $e;
+        }
     }
 }

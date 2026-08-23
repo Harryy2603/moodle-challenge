@@ -6,10 +6,18 @@ use App\Domain\UserRecord;
 use App\Domain\Normalizer;
 use App\Domain\Validator;
 use App\Infrastructure\CsvParser;
+use App\Repositories\UserRepository;
 use Exception;
 
 class ImportService
 {
+    private UserRepository $userRepository;
+
+    public function __construct(?UserRepository $userRepository = null)
+    {
+        $this->userRepository = $userRepository ?? new UserRepository();
+    }
+
     public function process(string $filePath, bool $dryRun = false): array
     {
         $results = [
@@ -42,6 +50,17 @@ class ImportService
                     }
                 }
 
+                if ($record->isValid && !$dryRun) {
+                    try {
+                        $inserted = $this->userRepository->insert($record);
+                        if (!$inserted) {
+                            $record->addError("Email already exists in the database");
+                        }
+                    } catch (Exception $e) {
+                        $record->addError("Database error: " . $e->getMessage());
+                    }
+                }
+=
                 if ($record->isValid) {
                     $results['total_valid']++;
                 } else {
