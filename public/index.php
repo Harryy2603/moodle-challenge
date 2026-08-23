@@ -33,11 +33,18 @@ if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_O
 $file = $_FILES['csv_file']['tmp_name'];
 $isDryRun = isset($_POST['dry_run']) && $_POST['dry_run'] === 'true';
 
-$service = new ImportService();
-$result = $service->process($file, $isDryRun);
+try {
+    $service = new ImportService();
+    $result = $service->process($file, $isDryRun);
 
-if (isset($result['error'])) {
+    if (isset($result['error'])) {
+        http_response_code(500);
+        echo json_encode(['error' => $result['error']]);
+        exit;
+    }
+
+    echo json_encode($result);
+} catch (\Exception $e) {
     http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
 }
-
-echo json_encode($result);

@@ -13,11 +13,11 @@ if (file_exists(__DIR__ . '/.env')) {
 
 $options = getopt("", ["file:", "dry-run", "create-table", "help"]);
 
-if (isset($options['help'])) {
-    echo "Usage: php user_upload.php [options]\n";
+if (isset($options['help']) || $argc === 1) {
+    echo "Usage: php user_upload.php [options]\n\n";
     echo "Options:\n";
     echo "  --file <filename>    CSV file to process\n";
-    echo "  --dry-run            Parse and validate without importing\n";
+    echo "  --dry-run            Parse and validate without importing (used with --file)\n";
     echo "  --create-table       Create/rebuild the users table\n";
     echo "  --help               Display available options\n";
     exit(0);
@@ -25,11 +25,16 @@ if (isset($options['help'])) {
 
 if (isset($options['create-table'])) {
     echo "Connecting to PostgreSQL database...\n";
-    $repository = new UserRepository();
-    echo "Rebuilding 'users' table...\n";
-    $repository->createTable();
-    echo "Success: Table 'users' created/rebuilt successfully.\n";
-    exit(0);
+    try {
+        $repository = new UserRepository();
+        echo "Rebuilding 'users' table...\n";
+        $repository->createTable();
+        echo "Success: Table 'users' created/rebuilt successfully.\n";
+        exit(0);
+    } catch (Exception $e) {
+        echo "\n[FATAL ERROR] Failed to create table: " . $e->getMessage() . "\n";
+        exit(1);
+    }
 }
 
 if (isset($options['file'])) {
@@ -41,42 +46,36 @@ if (isset($options['file'])) {
         echo "[DRY RUN MODE] Parsing and validating only. No database modifications.\n";
     }
 
-    $importService = new ImportService();
-    $result = $importService->process($filePath, $isDryRun);
+    try {
+        $importService = new ImportService();
+        $result = $importService->process($filePath, $isDryRun);
 
-    if (isset($result['error'])) {
-        echo "\n[FATAL ERROR] " . $result['error'] . "\n";
+        if (isset($result['error'])) {
+            echo "\n[ERROR] " . $result['error'] . "\n";
+            exit(1);
+        }
+
+        echo "\n--- IMPORT SUMMARY ---\n";
+        echo "Total Processed: " . $result['total_processed'] . "\n";
+        echo "Total Valid:     " . $result['total_valid'] . "\n";
+        echo "Total Invalid:   " . $result['total_invalid'] . "\n";
+
+        if ($result['total_invalid'] > 0) {
+            echo "\n--- VALIDATION ERRORS ---\n";
+            foreach ($result['records'] as $record) {
+                if (!$record->isValid) {
+                    $errors = implode(", ", $record->errors);
+                    $displayEmail = $record->email ?: 'Unknown Email';
+                    echo "- [{$displayEmail}] : {$errors}\n";
+                }
+            }
+        }
+        exit(0);
+    } catch (Exception $e) {
+        echo "\n[FATAL ERROR] An unexpected error occurred: " . $e->getMessage() . "\n";
         exit(1);
     }
-
-    echo "\n--- IMPORT SUMMARY ---\n";
-    echo "Total Processed: " . $result['total_processed'] . "\n";
-    echo "Total Valid:     " . $result['total_valid'] . "\n";
-    echo "Total Invalid:   " . $result['total_invalid'] . "\n";
-
-    if ($result['total_invalid'] > 0) {
-        echo "\n--- VALIDATION ERRORS ---\n";
-        foreach ($result['records'] as $record) {
-            if (!$record->isValid) {
-                $errors = implode(", ", $record->errors);
-                $displayEmail = $record->email ?: 'Unknown Email';
-                echo "- [{$displayEmail}] : {$errors}\n";
-            }
-        }
-    }
-    
-    if ($isDryRun) {
-        echo "\n--- DRY RUN PREVIEW (First 2 Valid Records) ---\n";
-        $printed = 0;
-        foreach ($result['records'] as $record) {
-            if ($record->isValid && $printed < 2) {
-                echo "- {$record->name} {$record->surname} <{$record->email}>\n";
-                $printed++;
-            }
-        }
-    }
-
-    exit(0);
 }
 
-echo "Run 'php user_upload.php --help' for usage instructions.\n";
+echo "Invalid usage. Run 'php user_upload.php --help' for usage instructions.\n";
+exit(1);
