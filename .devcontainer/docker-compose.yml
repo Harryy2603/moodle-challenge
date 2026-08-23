@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/php:1-8.3-bullseye
+    volumes:
+      - ../:/workspace:cached
+    command: sleep infinity
+    network_mode: service:db
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: moodle_user
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: user_import
